@@ -1,5 +1,6 @@
 const Web3 = require('web3');
 const Proxy = artifacts.require('./Proxy.sol');
+const DepositProxy = artifacts.require('./DepositProxy.sol');
 const HybridExchange = artifacts.require('./HybridExchange.sol');
 const TestToken = artifacts.require('./helper/TestToken.sol');
 const BigNumber = require('bignumber.js');
@@ -26,10 +27,11 @@ const newContractAt = (contract, address) => {
 
 let hotTokenAddress = null;
 let proxyAddress = null;
+let depositProxyAddress = null;
 let exchangeAddress = null;
 
 module.exports = async () => {
-    let hot, exchange, proxy;
+    let hot, exchange, proxy, depositProxy;
     try {
         if (!hotTokenAddress) {
             hot = await newContract(TestToken, 'HydroToken', 'Hot', 18);
@@ -47,8 +49,16 @@ module.exports = async () => {
         }
         console.log('Proxy address', web3.toChecksumAddress(proxyAddress));
 
+        if (!depositProxyAddress) {
+            depositProxy = await newContract(DepositProxy);
+            depositProxyAddress = depositProxy._address;
+        } else {
+            depositProxy = await newContractAt(DepositProxy, depositProxyAddress);
+        }
+        console.log('Proxy address', web3.toChecksumAddress(depositProxyAddress));
+
         if (!exchangeAddress) {
-            exchange = await newContract(HybridExchange, proxyAddress, hotTokenAddress);
+            exchange = await newContract(HybridExchange, hotTokenAddress);
             exchangeAddress = exchange._address;
         } else {
             exchange = await newContractAt(HybridExchange, exchangeAddress);
@@ -57,6 +67,9 @@ module.exports = async () => {
 
         await Proxy.at(proxyAddress).addAddress(exchangeAddress);
         console.log('Proxy add exchange into whitelist');
+
+        await Proxy.at(depositProxyAddress).addAddress(exchangeAddress);
+        console.log('DepositProxy add exchange into whitelist');
 
         process.exit(0);
     } catch (e) {

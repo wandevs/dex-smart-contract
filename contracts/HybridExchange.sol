@@ -36,11 +36,6 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
     uint256 public constant SUPPORTED_ORDER_VERSION = 2;
 
     /**
-     * Address of the proxy responsible for asset transfer.
-     */
-    address public proxyAddress;
-
-    /**
      * Mapping of orderHash => amount
      * Generally the amount will be specified in base token units, however in the case of a market
      * buy order the amount is specified in quote token units.
@@ -84,6 +79,7 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
         address baseToken;
         address quoteToken;
         address relayer;
+        address proxy;
     }
 
     struct MatchResult {
@@ -105,11 +101,10 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
         MatchResult result
     );
 
-    constructor(address _proxyAddress, address hotTokenAddress)
+    constructor(address hotTokenAddress)
         LibDiscount(hotTokenAddress)
         public
     {
-        proxyAddress = _proxyAddress;
     }
 
     /**
@@ -500,7 +495,8 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
                 orderAddressSet.baseToken,
                 results[i].taker,
                 results[i].maker,
-                results[i].baseTokenFilledAmount
+                results[i].baseTokenFilledAmount,
+                orderAddressSet.proxy
             );
 
             transferFrom(
@@ -510,7 +506,8 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
                 results[i].quoteTokenFilledAmount.
                     add(results[i].makerFee).
                     add(results[i].makerGasFee).
-                    sub(results[i].makerRebate)
+                    sub(results[i].makerRebate),
+                orderAddressSet.proxy
             );
 
             totalTakerQuoteTokenFilledAmount = totalTakerQuoteTokenFilledAmount.add(
@@ -524,7 +521,8 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
             orderAddressSet.quoteToken,
             orderAddressSet.relayer,
             results[0].taker,
-            totalTakerQuoteTokenFilledAmount.sub(results[0].takerGasFee)
+            totalTakerQuoteTokenFilledAmount.sub(results[0].takerGasFee),
+            orderAddressSet.proxy
         );
     }
 
@@ -561,7 +559,8 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
                 orderAddressSet.baseToken,
                 results[i].maker,
                 results[i].taker,
-                results[i].baseTokenFilledAmount
+                results[i].baseTokenFilledAmount,
+                orderAddressSet.proxy
             );
 
             transferFrom(
@@ -571,7 +570,8 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
                 results[i].quoteTokenFilledAmount.
                     sub(results[i].makerFee).
                     sub(results[i].makerGasFee).
-                    add(results[i].makerRebate)
+                    add(results[i].makerRebate),
+                orderAddressSet.proxy
             );
 
             totalFee = totalFee.
@@ -588,7 +588,8 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
             orderAddressSet.quoteToken,
             results[0].taker,
             orderAddressSet.relayer,
-            totalFee
+            totalFee,
+            orderAddressSet.proxy
         );
     }
 
@@ -603,13 +604,13 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
      * @param from The address we will be transferring from.
      * @param to The address we will be transferring to.
      * @param value The amount of token we will be transferring.
+     * @param proxy The address of the proxy responsible for asset transfer.
      */
-    function transferFrom(address token, address from, address to, uint256 value) internal {
+    function transferFrom(address token, address from, address to, uint256 value, address proxy) internal {
         if (value == 0) {
             return;
         }
 
-        address proxy = proxyAddress;
         uint256 result;
 
         /**

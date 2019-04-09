@@ -201,7 +201,8 @@ contract('Match', async accounts => {
             .matchOrders(takerOrder, makerOrders, baseTokenFilledAmounts, {
                 baseToken: baseTokenAddress,
                 quoteToken: quoteTokenAddress,
-                relayer
+                relayer,
+                proxy: proxy._address
             })
             .send({ from: relayer, gas: 10000000, gasLimit: 10000000 });
         console.log(`        ${makerOrders.length} Orders, Gas Used:`, res.gasUsed);

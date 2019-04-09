@@ -1,5 +1,6 @@
 const Web3 = require('web3');
 const Proxy = artifacts.require('./Proxy.sol');
+const DepositProxy = artifacts.require('./DepositProxy.sol');
 const HybridExchange = artifacts.require('./HybridExchange.sol');
 const TestToken = artifacts.require('./helper/TestToken.sol');
 const BigNumber = require('bignumber.js');
@@ -30,9 +31,13 @@ const setHotAmount = async (hotContract, user, amount) => {
     const diff = new BigNumber(amount).minus(balance);
 
     if (diff.gt(0)) {
-        await hotContract.methods.transfer(user, diff.toString()).send({ from: web3.eth.accounts[0] });
+        await hotContract.methods
+            .transfer(user, diff.toString())
+            .send({ from: web3.eth.accounts[0] });
     } else if (diff.lt(0)) {
-        await hotContract.methods.transfer(web3.eth.accounts[0], diff.abs().toString()).send({ from: user });
+        await hotContract.methods
+            .transfer(web3.eth.accounts[0], diff.abs().toString())
+            .send({ from: user });
     }
 };
 
@@ -40,17 +45,21 @@ const getContracts = async () => {
     const proxy = await newContract(Proxy);
     // console.log('Proxy address', web3.toChecksumAddress(proxy._address));
 
+    const depositProxy = await newContract(DepositProxy);
+
     const hot = await newContract(TestToken, 'HydroToken', 'Hot', 18);
     // console.log('Hydro Token address', web3.toChecksumAddress(hot._address));
 
-    const exchange = await newContract(HybridExchange, proxy._address, hot._address);
+    const exchange = await newContract(HybridExchange, hot._address);
     // console.log('Dxchange address', web3.toChecksumAddress(exchange._address));
 
     await proxy.methods.addAddress(exchange._address).send({ from: web3.eth.coinbase });
+    await depositProxy.methods.addAddress(exchange._address).send({ from: web3.eth.coinbase });
 
     return {
         hot,
         proxy,
+        depositProxy,
         exchange
     };
 };
