@@ -55,7 +55,7 @@ module.exports = async () => {
         } else {
             depositProxy = await newContractAt(DepositProxy, depositProxyAddress);
         }
-        console.log('Proxy address', web3.toChecksumAddress(depositProxyAddress));
+        console.log('DepositProxy address', web3.toChecksumAddress(depositProxyAddress));
 
         if (!exchangeAddress) {
             exchange = await newContract(HybridExchange, hotTokenAddress);
@@ -68,7 +68,7 @@ module.exports = async () => {
         await Proxy.at(proxyAddress).addAddress(exchangeAddress);
         console.log('Proxy add exchange into whitelist');
 
-        await Proxy.at(depositProxyAddress).addAddress(exchangeAddress);
+        await DepositProxy.at(depositProxyAddress).addAddress(exchangeAddress);
         console.log('DepositProxy add exchange into whitelist');
 
         process.exit(0);
