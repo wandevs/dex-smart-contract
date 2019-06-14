@@ -3,7 +3,7 @@ var PrivateKeyProvider = require('truffle-privatekey-provider');
 module.exports = {
     networks: {
         development: {
-            host: '127.0.0.1',
+            host: 'ethereum-node',
             port: 8545,
             network_id: '*',
             gas: 0xfffffffffff,
