@@ -68,7 +68,9 @@ const newMarket = async marketConfig => {
         liquidateRate: liquidateRate || 120,
         withdrawRate: withdrawRate || 200,
         baseAsset: baseAsset.address,
-        quoteAsset: quoteAsset.address
+        quoteAsset: quoteAsset.address,
+        auctionRatioStart: toWei('0.01'),
+        auctionRatioPerBlock: toWei('0.01')
     });
 
     const marketID = (await hydro.getAllMarketsCount()).toNumber() - 1;
@@ -200,6 +202,7 @@ const createAssets = async configs => {
 module.exports = {
     createAssets,
     createAsset,
+    depositMarket,
     supply,
     newMarket
 };

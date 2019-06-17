@@ -29,6 +29,7 @@ import "./funding/Markets.sol";
 import "./funding/Pool.sol";
 import "./funding/CollateralAccounts.sol";
 import "./funding/BatchActions.sol";
+import "./funding/Auctions.sol";
 
 import "./lib/Transfer.sol";
 import "./lib/Types.sol";
@@ -86,26 +87,28 @@ contract ExternalFunctions is GlobalStore, Modifiers {
         return state.markets[marketID];
     }
 
+    function getOracleOf(
+        address asset
+    )
+        external
+        view
+        returns (address)
+    {
+        return address(state.oracles[asset]);
+    }
+
     //////////////////////////////////
     // Collateral Account Functions //
     //////////////////////////////////
-
-    function liquidateAccounts(
-        address[] calldata users,
-        uint16[] calldata marketIDs
-    )
-        external
-    {
-        CollateralAccounts.liquidateMulti(state, users, marketIDs);
-    }
 
     function liquidateAccount(
         address user,
         uint16 marketID
     )
         external
+        returns (bool, uint32)
     {
-        CollateralAccounts.liquidate(state, user, marketID);
+        return CollateralAccounts.liquidate(state, user, marketID);
     }
 
     function isAccountLiquidable(
@@ -128,6 +131,45 @@ contract ExternalFunctions is GlobalStore, Modifiers {
         returns (Types.CollateralAccountDetails memory details)
     {
         return CollateralAccounts.getDetails(state, user, marketID);
+    }
+
+    function getAccountBalance(
+        address asset,
+        address user,
+        uint16 marketID
+    )
+        external
+        view
+        returns (uint256)
+    {
+        return state.accounts[user][marketID].balances[asset];
+    }
+
+    function getAuctionsCount()
+        external
+        view
+        returns (uint32)
+    {
+        return state.auction.auctionsCount;
+    }
+
+    function getAuctionDetails(
+        uint32 auctionID
+    )
+        external
+        view
+        returns (Types.AuctionDetails memory details)
+    {
+        return Auctions.getAuctionDetails(state, auctionID);
+    }
+
+    function fillAuctionWithAmount(
+        uint32 auctionID,
+        uint256 amount
+    )
+        external
+    {
+        return Auctions.fillAuctionWithAmount(state, auctionID, amount);
     }
 
     ////////////////////
@@ -181,7 +223,7 @@ contract ExternalFunctions is GlobalStore, Modifiers {
         return Pool._getPoolSupplyOf(state, asset, user);
     }
 
-    function getPoolInterestRate(
+    function getInterestRate(
         address asset,
         uint256 extraBorrowAmount
     )
@@ -238,6 +280,7 @@ contract ExternalFunctions is GlobalStore, Modifiers {
             asset,
             amount
         );
+        require(!CollateralAccounts.getDetails(state, msg.sender, marketID).liquidable, "CAN_NOT_BORROW_MORE_THAN_COLLATERAL");
     }
 
     function repay(
@@ -266,6 +309,29 @@ contract ExternalFunctions is GlobalStore, Modifiers {
         returns (address)
     {
         return state.pool.poolToken[asset];
+    }
+
+    /////////////////////////
+    // Insurance Functions //
+    /////////////////////////
+
+    function getInsuranceBalance(
+        address asset
+    )
+        external
+        view
+        requireAssetExist(asset)
+        returns (uint256)
+    {
+        return state.insuranceBalances[asset];
+    }
+
+    function badDebt(
+        uint32 auctionID
+    )
+        external
+    {
+        Auctions.badDebt(state, auctionID);
     }
 
     ///////////////////////
@@ -301,39 +367,43 @@ contract ExternalFunctions is GlobalStore, Modifiers {
     ////////////////////////
 
     function deposit(address asset, uint256 amount) external payable {
-        Transfer.depositFor(state, asset, msg.sender, WalletPath.getBalancePath(msg.sender), amount);
+        Transfer.depositFor(state, asset, msg.sender, BalancePath.getBalancePath(msg.sender), amount);
     }
 
     function withdraw(address asset, uint256 amount) external {
-        Transfer.withdrawFrom(state, asset, WalletPath.getBalancePath(msg.sender), msg.sender, amount);
+        Transfer.withdrawFrom(state, asset, BalancePath.getBalancePath(msg.sender), msg.sender, amount);
     }
 
     function transfer(
         address asset,
-        Types.WalletPath calldata fromWalletPath,
-        Types.WalletPath calldata toWalletPath,
+        Types.BalancePath calldata fromBalancePath,
+        Types.BalancePath calldata toBalancePath,
         uint256 amount
     )
         external
     {
-        require(fromWalletPath.user == msg.sender, "CAN_NOT_MOVE_OTHERS_ASSET");
-        require(toWalletPath.user == msg.sender, "CAN_NOT_MOVE_ASSET_TO_OTHER"); // should we allow to transfer to other ??
+        require(fromBalancePath.user == msg.sender, "CAN_NOT_MOVE_OTHERS_ASSET");
+        require(toBalancePath.user == msg.sender, "CAN_NOT_MOVE_ASSET_TO_OTHER"); // should we allow to transfer to other ??
 
-        Transfer.transferFrom(state, asset, fromWalletPath, toWalletPath, amount);
+        Transfer.transferFrom(state, asset, fromBalancePath, toBalancePath, amount);
     }
 
     function balanceOf(address asset, address user) external view returns (uint256) {
-        return Transfer.balanceOf(state,  WalletPath.getBalancePath(user), asset);
+        return Transfer.balanceOf(state,  BalancePath.getBalancePath(user), asset);
     }
 
     function marketBalanceOf(uint16 marketID, address asset, address user) external view returns (uint256) {
-        return Transfer.balanceOf(state,  WalletPath.getMarketPath(user, marketID), asset);
+        return Transfer.balanceOf(state,  BalancePath.getMarketPath(user, marketID), asset);
+    }
+
+    function getMarketTransferableAmount(uint16 marketID, address asset, address user) external view returns (uint256) {
+        return CollateralAccounts.getTransferableAmount(state, marketID, user, asset);
     }
 
     /** fallback function to allow deposit ether into this contract */
     function () external payable {
         // deposit ${msg.value} ether for ${msg.sender}
-        Transfer.depositFor(state, Consts.ETHEREUM_TOKEN_ADDRESS(), msg.sender, WalletPath.getBalancePath(msg.sender), msg.value);
+        Transfer.depositFor(state, Consts.ETHEREUM_TOKEN_ADDRESS(), msg.sender, BalancePath.getBalancePath(msg.sender), msg.value);
     }
 
     ////////////////////////
@@ -354,10 +424,6 @@ contract ExternalFunctions is GlobalStore, Modifiers {
 
     function getDiscountedRate(address user) external view returns (uint256) {
         return Discount.getDiscountedRate(state, user);
-    }
-
-    function getDiscountConfig() external view returns (bytes32) {
-        return state.exchange.discountConfig;
     }
 
     function getHydroTokenAddress() external view returns (address) {

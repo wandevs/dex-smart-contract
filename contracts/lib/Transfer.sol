@@ -25,10 +25,11 @@ import "./SafeERC20.sol";
 import "./Consts.sol";
 import "./Store.sol";
 import "./Types.sol";
+import "../funding/CollateralAccounts.sol";
 
 library Transfer {
     using SafeMath for uint256;
-    using WalletPath for Types.WalletPath;
+    using BalancePath for Types.BalancePath;
 
     /** @dev Transfer asset into current contract
       */
@@ -36,7 +37,7 @@ library Transfer {
         Store.State storage state,
         address asset,
         address from,
-        Types.WalletPath memory toWalletPath,
+        Types.BalancePath memory toBalancePath,
         uint256 amount
     )
         internal
@@ -47,9 +48,9 @@ library Transfer {
             require(amount == msg.value, "MSG_VALUE_AND_AMOUNT_MISMATCH");
         }
 
-        Types.Wallet storage toWallet = toWalletPath.getWallet(state);
-        toWallet.balances[asset] = toWallet.balances[asset].add(amount);
-        Events.logDeposit(asset, from, toWalletPath, amount);
+        mapping(address => uint256) storage toBalances = toBalancePath.getBalances(state);
+        toBalances[asset] = toBalances[asset].add(amount);
+        Events.logDeposit(asset, from, toBalancePath, amount);
     }
 
     /** @dev Transfer asset out of current contract
@@ -57,17 +58,17 @@ library Transfer {
     function withdrawFrom(
         Store.State storage state,
         address asset,
-        Types.WalletPath memory fromWalletPath,
+        Types.BalancePath memory fromBalancePath,
         address payable to,
         uint256 amount
     )
         internal
     {
-        Types.Wallet storage fromWallet = fromWalletPath.getWallet(state);
+        mapping(address => uint256) storage fromBalances = fromBalancePath.getBalances(state);
 
-        require(fromWallet.balances[asset] >= amount, "BALANCE_NOT_ENOUGH");
+        require(fromBalances[asset] >= amount, "BALANCE_NOT_ENOUGH");
 
-        fromWallet.balances[asset] = fromWallet.balances[asset].sub(amount);
+        fromBalances[asset] = fromBalances[asset].sub(amount);
 
         if (asset == Consts.ETHEREUM_TOKEN_ADDRESS()) {
             to.transfer(amount);
@@ -75,22 +76,55 @@ library Transfer {
             SafeERC20.safeTransfer(asset, to, amount);
         }
 
-        Events.logWithdraw(asset, fromWalletPath, to, amount);
+        Events.logWithdraw(asset, fromBalancePath, to, amount);
     }
 
     /** @dev Get a user's asset balance
       */
     function balanceOf(
         Store.State storage state,
-        Types.WalletPath memory walletPath,
+        Types.BalancePath memory balancePath,
         address asset
     )
         internal
         view
         returns (uint256)
     {
-        Types.Wallet storage wallet = walletPath.getWallet(state);
-        return wallet.balances[asset];
+        mapping(address => uint256) storage balances = balancePath.getBalances(state);
+        return balances[asset];
+    }
+
+    function validTransferOut(
+        Store.State storage state,
+        Types.BalancePath memory path,
+        address asset,
+        uint256 amount
+    )
+        internal
+        view
+    {
+        if (path.category == Types.BalanceCategory.CollateralAccount) {
+            uint256 transferableAmount = CollateralAccounts.getTransferableAmount(state, path.marketID, path.user, asset);
+
+            if (transferableAmount < amount) {
+                revert("NO_ENOUGH_TRANSFERABLE_AMOUNT");
+            }
+        }
+    }
+
+    function validTransferIn(
+        Store.State storage state,
+        Types.BalancePath memory path
+    )
+        internal
+        view
+    {
+        if (path.category == Types.BalanceCategory.CollateralAccount) {
+            Types.CollateralAccount storage account = state.accounts[path.user][path.marketID];
+            if (account.status == Types.CollateralAccountStatus.Liquid) {
+                revert("CAN_NOT_OPERATOR_LIQUIDATING_COLLATERAL_ACCOUNT");
+            }
+        }
     }
 
     /** @dev Invoking internal funds transfer.
@@ -98,20 +132,24 @@ library Transfer {
     function transferFrom(
         Store.State storage state,
         address asset,
-        Types.WalletPath memory fromWalletPath,
-        Types.WalletPath memory toWalletPath,
+        Types.BalancePath memory fromBalancePath,
+        Types.BalancePath memory toBalancePath,
         uint256 amount
     )
         internal
     {
-        Types.Wallet storage fromWallet = fromWalletPath.getWallet(state);
-        Types.Wallet storage toWallet = toWalletPath.getWallet(state);
+        validTransferOut(state, fromBalancePath, asset, amount);
+        validTransferIn(state, toBalancePath);
 
-        require(fromWallet.balances[asset] >= amount, "TRANSFER_BALANCE_NOT_ENOUGH");
+        mapping(address => uint256) storage fromBalances = fromBalancePath.getBalances(state);
+        mapping(address => uint256) storage toBalances = toBalancePath.getBalances(state);
 
-        fromWallet.balances[asset] = fromWallet.balances[asset].sub(amount);
-        toWallet.balances[asset] = toWallet.balances[asset].add(amount);
+        require(fromBalances[asset] >= amount, "TRANSFER_BALANCE_NOT_ENOUGH");
 
-        Events.logTransfer(asset, fromWalletPath, toWalletPath, amount);
+        fromBalances[asset] = fromBalances[asset].sub(amount);
+        toBalances[asset] = toBalances[asset].add(amount);
+
+        Events.logTransfer(asset, fromBalancePath, toBalancePath, amount);
     }
+
 }

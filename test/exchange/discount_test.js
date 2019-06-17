@@ -2,12 +2,18 @@ require('../utils/hooks');
 
 const assert = require('assert');
 const Hydro = artifacts.require('./Hydro.sol');
+const HydroToken = artifacts.require('./HydroToken.sol');
 
 contract('Discount', accounts => {
-    let hydro;
+    let hydro, hot;
 
     before(async () => {
         hydro = await Hydro.deployed();
+        hot = await HydroToken.deployed();
+    });
+
+    it('can get hot address', async () => {
+        assert.equal(await hydro.getHydroTokenAddress(), hot.address);
     });
 
     it('can change discount', async () => {
@@ -30,16 +36,12 @@ contract('Discount', accounts => {
     });
 
     it('cannot change discount without permissions', async () => {
-        try {
-            await hydro.changeDiscountConfig(
+        await assert.rejects(
+            hydro.changeDiscountConfig(
                 '0x040a000027106400004e205a000075305000009c404600000000000000000000',
                 { from: accounts[1] }
-            );
-        } catch (e) {
-            assert.ok(e.message.match(/NOT_OWNER/));
-            return;
-        }
-
-        assert(false, 'Should never get here');
+            ),
+            /NOT_OWNER/
+        );
     });
 });

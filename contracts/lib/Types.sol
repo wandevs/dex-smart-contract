@@ -16,7 +16,7 @@
 
 */
 
-pragma solidity 0.5.8;
+pragma solidity ^0.5.8;
 pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
@@ -25,11 +25,17 @@ import "./Math.sol";
 import "./Consts.sol";
 import "./Store.sol";
 import "./Signature.sol";
+import "./Decimal.sol";
 
 library Types {
     enum LoanSource {
         Pool,
         P2P
+    }
+
+    enum AuctionStatus {
+        InProgress,
+        Finished
     }
 
     enum CollateralAccountStatus {
@@ -63,17 +69,13 @@ library Types {
         bytes32 s;
     }
 
-    struct Wallet {
-        mapping(address => uint256) balances;
-    }
-
-    enum WalletCategory {
-        Balance,
+    enum BalanceCategory {
+        Common,
         CollateralAccount
     }
 
-    struct WalletPath {
-        WalletCategory category;
+    struct BalancePath {
+        BalanceCategory category;
         uint16 marketID;
         address user;
     }
@@ -87,6 +89,9 @@ library Types {
 
         address baseAsset;
         address quoteAsset;
+
+        uint256 auctionRatioStart;
+        uint256 auctionRatioPerBlock;
     }
 
     struct CollateralAccount {
@@ -95,18 +100,20 @@ library Types {
         CollateralAccountStatus status;
         address owner;
 
-        Wallet wallet;
+        mapping(address => uint256) balances;
     }
 
     // memory only
     struct CollateralAccountDetails {
         bool       liquidable;
+        CollateralAccountStatus status;
         uint256    debtsTotalUSDValue;
         uint256    balancesTotalUSDValue;
     }
 
     struct Auction {
         uint32 id;
+        AuctionStatus status;
 
         // To calculate the ratio
         uint32 startBlockNumber;
@@ -114,9 +121,18 @@ library Types {
         uint16 marketID;
 
         address borrower;
-        address debtAsset;
+        address initiator;
 
+        address debtAsset;
         address collateralAsset;
+    }
+
+    struct AuctionDetails {
+        address debtAsset;
+        address collateralAsset;
+        uint256 leftDebtAmount;
+        uint256 leftCollateralAmount;
+        uint256 ratio;
     }
 
     struct Order {
@@ -142,7 +158,7 @@ library Types {
          * ║ makerRebateRate    │ 2               rebate rate for maker (base 100)          ║
          * ║ salt               │ 8               salt                                      ║
          * ║ isMakerOnly        │ 1               is maker only                             ║
-         * ║ walletType         │ 1               0: balance, 1: market                     ║
+         * ║ balancesType       │ 1               0: common, 1: collateralAccount           ║
          * ║ marketID           │ 2               marketID                                  ║
          * ║                    │ 6               reserved                                  ║
          * ╚════════════════════╧═══════════════════════════════════════════════════════════╝
@@ -185,8 +201,8 @@ library Types {
         uint256 takerGasFee;
         uint256 baseAssetFilledAmount;
         uint256 quoteAssetFilledAmount;
-        WalletPath makerWalletPath;
-        WalletPath takerWalletPath;
+        BalancePath makerBalancePath;
+        BalancePath takerBalancePath;
     }
     /**
      * @param takerOrderParam A Types.OrderParam object representing the order from the taker.
@@ -209,18 +225,29 @@ library Types {
 }
 
 library Auction {
-    function ratio(Types.Auction memory auction) internal view returns (uint256) {
-        uint256 currentRatio = block.number - auction.startBlockNumber;
-        return currentRatio < 100 ? currentRatio : 100;
+    using SafeMath for uint256;
+
+    function ratio(
+        Types.Auction memory auction,
+        Store.State storage state
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 increasedRatio = (block.number - auction.startBlockNumber).mul(state.markets[auction.marketID].auctionRatioPerBlock);
+        uint256 initRatio = state.markets[auction.marketID].auctionRatioStart;
+        uint256 totalRatio = initRatio.add(increasedRatio);
+        return totalRatio < Decimal.one() ? totalRatio : Decimal.one();
     }
 }
 
-library WalletPath {
-    function getWallet(Types.WalletPath memory path, Store.State storage state) internal view returns (Types.Wallet storage) {
-        if (path.category == Types.WalletCategory.Balance) {
-            return state.wallets[path.user];
+library BalancePath {
+    function getBalances(Types.BalancePath memory path, Store.State storage state) internal view returns (mapping(address => uint256) storage) {
+        if (path.category == Types.BalanceCategory.Common) {
+            return state.balances[path.user];
         } else {
-            return state.accounts[path.user][path.marketID].wallet;
+            return state.accounts[path.user][path.marketID].balances;
         }
     }
 
@@ -229,11 +256,11 @@ library WalletPath {
     )
         internal
         pure
-        returns (Types.WalletPath memory)
+        returns (Types.BalancePath memory)
     {
-        return Types.WalletPath({
+        return Types.BalancePath({
             user: user,
-            category: Types.WalletCategory.Balance,
+            category: Types.BalanceCategory.Common,
             marketID: 0
         });
     }
@@ -244,11 +271,11 @@ library WalletPath {
     )
         internal
         pure
-        returns (Types.WalletPath memory)
+        returns (Types.BalancePath memory)
     {
-        return Types.WalletPath({
+        return Types.BalancePath({
             user: user,
-            category: Types.WalletCategory.CollateralAccount,
+            category: Types.BalanceCategory.CollateralAccount,
             marketID: marketID
         });
     }
@@ -361,19 +388,19 @@ library OrderParam {
         return Math.min(makerRebate, Consts.REBATE_RATE_BASE());
     }
 
-    function getWalletPathFromOrderData(Types.OrderParam memory order) internal pure returns (Types.WalletPath memory) {
-        Types.WalletCategory category;
+    function getBalancePathFromOrderData(Types.OrderParam memory order) internal pure returns (Types.BalancePath memory) {
+        Types.BalanceCategory category;
         uint16 marketID;
 
         if (byte(order.data << (8*23)) == "\x01") {
-            category = Types.WalletCategory.CollateralAccount;
+            category = Types.BalanceCategory.CollateralAccount;
             marketID = uint16(bytes2(order.data << (8*24)));
         } else {
-            category = Types.WalletCategory.Balance;
+            category = Types.BalanceCategory.Common;
             marketID = 0;
         }
 
-        return Types.WalletPath({
+        return Types.BalancePath({
             user: order.trader,
             category: category,
             marketID: marketID
