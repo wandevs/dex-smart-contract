@@ -6,5 +6,6 @@ hydroContract = web3.eth.contract([{"constant":false,"inputs":[{"name":"delegate
 // tt.transfer("0x31ebd457b999bf99759602f5ece5aa5033cb56b3","0xDE0B6B3A7640000",{from:eth.coinbase,gas:'0x47DE70', gasPrice:'0x29E8D60800'})
 hydro = hydroContract.at("0x8786038ef9c2f659772c6c2ee8402bdfdc511bb8");
 test  = testContract.at("0x90fb6abca9aa83044abcdaa6f0bf2fb3d63fa45a");
-wwan  = hydroContract.at("0x8786038ef9c2f659772c6c2ee8402bdfdc511bb8");
-hydro = hydroContract.at("0x8786038ef9c2f659772c6c2ee8402bdfdc511bb8");
+wwan  = wwanContract.at("0x8786038ef9c2f659772c6c2ee8402bdfdc511bb8");
+proxy = proxyContract.at("0x9e57b9f1d836ff1701e441a619cbaad7fc8863d3");
+proxy.addAddress("", {from:"0xbf12c73CCC1F7F670Bf80d0BBa93Fe5765df9FEc",gas:'0x47DE70', gasPrice:'0x29E8D60800'});

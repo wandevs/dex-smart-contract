@@ -1,23 +1,23 @@
 var PrivateKeyProvider = require('truffle-privatekey-provider');
 
 // key store
-// const KeystoreProvider = require("truffle-keystore-provider");
-//
-// const memoizeKeystoreProviderCreator = () => {
-//     let providers = {};
-//
-//     return (account, dataDir, providerUrl) => {
-//         if (providerUrl in providers) {
-//             return providers[providerUrl]
-//         } else {
-//             const provider = new KeystoreProvider(account, dataDir, providerUrl);
-//             providers[providerUrl] = provider;
-//             return provider
-//         }
-//     }
-// };
-//
-// const createKeystoreProvider = memoizeKeystoreProviderCreator()
+const KeystoreProvider = require("truffle-keystore-provider");
+
+const memoizeKeystoreProviderCreator = () => {
+    let providers = {};
+
+    return (account, dataDir, providerUrl) => {
+        if (providerUrl in providers) {
+            return providers[providerUrl]
+        } else {
+            const provider = new KeystoreProvider(account, dataDir, providerUrl);
+            providers[providerUrl] = provider;
+            return provider
+        }
+    }
+};
+
+const createKeystoreProvider = memoizeKeystoreProviderCreator();
 
 // export
 module.exports = {
@@ -55,13 +55,13 @@ module.exports = {
             gas: 4710000,
             gasPrice: 180000000000
         },
-        // test4: {
-        //     // provider: createKeystoreProvider(process.env.ACCOUNT, process.env.DATA_DIR, "https://rinkeby.infura.io"),
-        //     provider: createKeystoreProvider("bf12c73ccc1f7f670bf80d0bba93fe5765df9fec", "/home/jsw/go/src/github.com/wanchain/dex-smart-contract", "https://mywanwallet.io/testnet"),
-        //     network_id: "*",
-        //     gas: 4710000,
-        //     gasPrice: 180000000000
-        // }
+        test4: {
+            // provider: createKeystoreProvider(process.env.ACCOUNT, process.env.DATA_DIR, "https://rinkeby.infura.io"),
+            provider: createKeystoreProvider("bf12c73ccc1f7f670bf80d0bba93fe5765df9fec", "/home/jsw/go/src/github.com/wanchain/dex-smart-contract", "https://mywanwallet.io/testnet"),
+            network_id: "*",
+            gas: 4710000,
+            gasPrice: 180000000000
+        }
     },
     compilers: {
         solc: {
