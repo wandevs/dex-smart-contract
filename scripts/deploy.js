@@ -7,7 +7,7 @@ const BigNumber = require('bignumber.js');
 BigNumber.config({ EXPONENTIAL_AT: 1000 });
 
 const getWeb3 = () => {
-    const myWeb3 = new Web3(web3.currentProvider);
+    const myWeb3 = new Web3(web3.currentProvider || "http://127.0.0.1:8545");
     return myWeb3;
 };
 
@@ -29,6 +29,7 @@ let proxyAddress = null;
 let exchangeAddress = null;
 
 module.exports = async () => {
+// const mydeploy = async () => {
     let hot, exchange, proxy;
     try {
         if (!hotTokenAddress) {
@@ -63,3 +64,4 @@ module.exports = async () => {
         console.log(e);
     }
 };
+

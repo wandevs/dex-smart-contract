@@ -141,26 +141,26 @@ contract HybridExchange is LibMath, LibOrder, LibRelayer, LibDiscount, LibExchan
             require(isSell(takerOrderParam.data) != isSell(makerOrderParams[i].data), INVALID_SIDE);
             validatePrice(takerOrderParam, makerOrderParams[i]);
 
-            OrderInfo memory makerOrderInfo = getOrderInfo(makerOrderParams[i], orderAddressSet);
+           OrderInfo memory makerOrderInfo = getOrderInfo(makerOrderParams[i], orderAddressSet);
 
-            results[i] = getMatchResult(
-                takerOrderParam,
-                takerOrderInfo,
-                makerOrderParams[i],
-                makerOrderInfo,
-                baseTokenFilledAmounts[i],
-                takerFeeRate,
-                isParticipantRelayer
-            );
+           results[i] = getMatchResult(
+               takerOrderParam,
+               takerOrderInfo,
+               makerOrderParams[i],
+               makerOrderInfo,
+               baseTokenFilledAmounts[i],
+               takerFeeRate,
+               isParticipantRelayer
+           );
 
-            // Update amount filled for this maker order.
-            filled[makerOrderInfo.orderHash] = makerOrderInfo.filledAmount;
+           // Update amount filled for this maker order.
+           filled[makerOrderInfo.orderHash] = makerOrderInfo.filledAmount;
         }
 
         // Update amount filled for this taker order.
         filled[takerOrderInfo.orderHash] = takerOrderInfo.filledAmount;
 
-        settleResults(results, takerOrderParam, orderAddressSet);
+        // settleResults(results, takerOrderParam, orderAddressSet);
     }
 
     /**
