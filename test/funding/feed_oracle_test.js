@@ -2,63 +2,45 @@ require('../utils/hooks');
 
 const assert = require('assert');
 const { toWei, logGas } = require('../utils');
-const { getBlockNumber, mine } = require('../utils/evm');
+const { mine, mineAt } = require('../utils/evm');
 const FeedPriceOracle = artifacts.require('./oracle/FeedPriceOracle.sol');
 
 contract('FeedPriceOracle', accounts => {
     let oracle;
     let ethTokenAddress = '0x000000000000000000000000000000000000000E';
+    let anotherAddressForTest = '0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE';
 
     beforeEach(async () => {
         oracle = await FeedPriceOracle.new(
-            ethTokenAddress,
+            [ethTokenAddress, anotherAddressForTest],
             10,
             toWei('0.1'), // 10%
             toWei('1'), // 1
             toWei('10') // 10
         );
-        await oracle.feed(toWei('2'), (await web3.eth.getBlockNumber()) + 1);
+        await oracle.feed(toWei('2'));
     });
 
     // successful feed & get
     it('feed price', async () => {
-        let currentBlockNumber = await web3.eth.getBlockNumber();
-        res = await oracle.feed(toWei('2.02'), currentBlockNumber + 1);
+        res = await oracle.feed(toWei('2.02'));
         logGas(res, 'FeedPriceOracle.feed');
 
         assert.equal((await oracle.getPrice(ethTokenAddress)).toString(), toWei('2.02'));
+        assert.equal((await oracle.getPrice(anotherAddressForTest)).toString(), toWei('2.02'));
+
+        const invalidAddress = '0x0000000000000000000000000000000000000000';
+        await assert.rejects(oracle.getPrice(invalidAddress), /ASSET_NOT_MATCH/);
     });
 
     // failed feed
 
-    it('can not feed invalid block number', async () => {
-        let currentBlockNumber = await web3.eth.getBlockNumber();
-        await assert.rejects(oracle.feed(toWei('2'), currentBlockNumber + 2), /BLOCKNUMBER_WRONG/);
-        await assert.rejects(oracle.feed(toWei('2'), currentBlockNumber - 1), /BLOCKNUMBER_WRONG/);
-    });
-
     it('can not feed invalid price', async () => {
-        let currentBlockNumber = await web3.eth.getBlockNumber();
-        await assert.rejects(
-            oracle.feed(toWei('2.21'), currentBlockNumber + 1),
-            /PRICE_CHANGE_RATE_EXCEED/
-        );
-        await assert.rejects(
-            oracle.feed(toWei('1.79'), currentBlockNumber + 1),
-            /PRICE_CHANGE_RATE_EXCEED/
-        );
-        await assert.rejects(
-            oracle.feed(toWei('0'), currentBlockNumber + 1),
-            /PRICE_MUST_GREATER_THAN_0/
-        );
-        await assert.rejects(
-            oracle.feed(toWei('100'), currentBlockNumber + 1),
-            /PRICE_EXCEED_MAX_LIMIT/
-        );
-        await assert.rejects(
-            oracle.feed(toWei('0.1'), currentBlockNumber + 1),
-            /PRICE_EXCEED_MIN_LIMIT/
-        );
+        await assert.rejects(oracle.feed(toWei('2.21')), /PRICE_CHANGE_RATE_EXCEED/);
+        await assert.rejects(oracle.feed(toWei('1.79')), /PRICE_CHANGE_RATE_EXCEED/);
+        await assert.rejects(oracle.feed(toWei('0')), /PRICE_MUST_GREATER_THAN_0/);
+        await assert.rejects(oracle.feed(toWei('100')), /PRICE_EXCEED_MAX_LIMIT/);
+        await assert.rejects(oracle.feed(toWei('0.1')), /PRICE_EXCEED_MIN_LIMIT/);
     });
 
     // failed get
