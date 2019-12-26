@@ -24,7 +24,7 @@ module.exports = {
     networks: {
         development: {
             host: '127.0.0.1',
-            port: 8545,
+            port: 7545,
             network_id: '*',
             gas: 4000000,
             gasPrice: 1
@@ -57,7 +57,7 @@ module.exports = {
         },
         test4: {
             // provider: createKeystoreProvider(process.env.ACCOUNT, process.env.DATA_DIR, "https://rinkeby.infura.io"),
-            provider: createKeystoreProvider("bf12c73ccc1f7f670bf80d0bba93fe5765df9fec", "/home/jsw/go/src/github.com/wanchain/dex-smart-contract", "https://mywanwallet.io/testnet"),
+            // provider: createKeystoreProvider("bf12c73ccc1f7f670bf80d0bba93fe5765df9fec", "/home/jsw/go/src/github.com/wanchain/dex-smart-contract", "https://mywanwallet.io/testnet"),
             network_id: "*",
             gas: 4710000,
             gasPrice: 180000000000
