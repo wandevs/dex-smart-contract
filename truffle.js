@@ -51,11 +51,28 @@ module.exports = {
             network_id: '*',
             gas: 0xfffffffffff,
             gasPrice: 1
+        },
+        test3: {
+            host: "127.0.0.1",
+            port: 7545,
+            network_id: "*", // Match any network id
+            gas: 10000000,
+            gasPrice: 180e9,
+            from: "0x06f6B911A07E73E90FD9Dcb56C970cdBaA7E4e52",
+        },
+        wanchainTestnet: {
+            host: "192.168.1.19",
+            port: 3333,
+            network_id: "*", // Match any network id
+            gas: 0x989680,
+            gasPrice: 180000000000,
+            from: "0xbf12c73ccc1f7f670bf80d0bba93fe5765df9fec",
         }
     },
     compilers: {
         solc: {
             version: '0.5.8',
+            evmVersion: "byzantium",
             settings: {
                 optimizer: {
                     enabled: true,
@@ -64,7 +81,7 @@ module.exports = {
             }
         }
 
-        // If you have 0.5.8 solc installed locally, you can use the following config to speed up tests.
+        // If you have 0.5.13 solc installed locally, you can use the following config to speed up tests.
         //
         //  solc: {
         //     version: 'native'

@@ -83,7 +83,7 @@ library Discount {
         Store.State storage state,
         address user
     )
-        internal
+        external
         view
         returns (uint256 result)
     {

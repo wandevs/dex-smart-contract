@@ -10,6 +10,7 @@ const CommonInterestModel = artifacts.require('CommonInterestModel');
 
 const Auctions = artifacts.require('Auctions');
 const BatchActions = artifacts.require('BatchActions');
+const Discount = artifacts.require('Discount');
 
 const OperationsComponent = artifacts.require('OperationsComponent');
 
@@ -20,10 +21,12 @@ module.exports = async (deployer, network) => {
         await deployer.deploy(BatchActions);
         await deployer.deploy(Auctions);
         await deployer.deploy(OperationsComponent);
+        await deployer.deploy(Discount);
 
         await deployer.link(BatchActions, Hydro);
         await deployer.link(OperationsComponent, Hydro);
         await deployer.link(Auctions, Hydro);
+        await deployer.link(Discount, Hydro);
 
         await deployer.deploy(Hydro, hotAddress);
     };
