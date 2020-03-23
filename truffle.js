@@ -49,8 +49,8 @@ module.exports = {
         },
         test3: {
             from: "0xbf12c73ccc1f7f670bf80d0bba93fe5765df9fec",
-            host: "192.168.1.19",
-            port: 3333,
+            host: "34.215.211.141",
+            port: 8888,
             network_id: "*",
             gas: 4710000,
             gasPrice: 180000000000
@@ -71,7 +71,7 @@ module.exports = {
                     enabled: true,
                     runs: 200
                 },
-		evmVersion: "byzantium"
+		        evmVersion: "byzantium"
             }
         }
     },
